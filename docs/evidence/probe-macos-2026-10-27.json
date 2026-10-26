@@ -192,12 +192,17 @@
     "audio.sharedArrayBuffer",
     "push"
   ],
-  "extra": {
+  "experiments": {
     "sessionRoundTrip": {
       "documentCookie": "orbit-desktop-probe=1",
       "loginStatus": 200,
       "meStatus": 200,
       "secondMe": "desksmoke"
+    },
+    "ipcAllowList": {
+      "denied": "http://localhost:5174 — page served (HTTP 200 in the server log), probe injected, no report: invoke rejected",
+      "allowed": "http://localhost:5174 after adding it to capabilities/main-remote.json — the same page reported",
+      "note": "the temporary capability entry was reverted; the committed list is localhost:5173 and orbit.invalid"
     }
   }
 }

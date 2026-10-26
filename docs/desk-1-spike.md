@@ -31,8 +31,8 @@ ORBIT_DESKTOP_PROBE=1 pnpm dev                     # 3. оболочка + пр�
 
 | Что | macOS | Windows | Чем подтверждено |
 | --- | --- | --- | --- |
-| Окно открывает удалённый origin | ✅ | ⬜ | `[orbit-desktop] opening http://localhost:5173`, `location.origin` в отчёте пробы, экран логина отрисован |
-| IPC разрешён только своему origin | ✅ | ⬜ | проба дошла до Rust (`report_spike`) на `localhost:5173`; на локальной странице-заглушке команда отклонена — `[probe]` не напечатался |
+| Окно открывает удалённый origin | ✅ | ⬜ | `[orbit-desktop] opening http://localhost:5173`; проба выполнилась в документе приложения и сообщила `location.origin = http://localhost:5173` |
+| IPC разрешён только своему origin | ✅ | ⬜ | A/B на одной и той же странице: `localhost:5174` вне allow-list → страница загрузилась (200 в логе сервера), отчёта нет; добавили `5174` в capability → отчёт пришёл. Встроенная страница-заглушка IPC не получает по конфигурации (`local: false`) |
 | Вход по HttpOnly cookie `SameSite=Lax` | ✅ | ⬜ | `POST /auth/login` → 200, затем два `GET /auth/me` с `credentials: 'include'` → 200 и ник `desksmoke`; `document.cookie` сессию не содержит |
 | Чат (лента, отправка) | ⬜ | ⬜ | не прогнан: нужен человек за окном |
 | Голос: WebRTC и кодек Opus | ⚠️ | ⬜ | `RTCPeerConnection.addTransceiver`, `audio/opus`, `audio/red`, `video/VP8`, `video/VP9`, `video/H264` в `RTCRtpSender.getCapabilities` |
