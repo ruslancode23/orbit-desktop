@@ -1,0 +1,203 @@
+{
+  "when": "2026-10-27",
+  "machine": "MacBook Pro (Apple Silicon, arm64), macOS 27.0 (26A428)",
+  "shell": {
+    "tauri": "2.12.5",
+    "wry": "0.57.1",
+    "window": "http://localhost:5173 (Vite, orbit-web dev)"
+  },
+  "webview": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+    "screen": {
+      "availHeight": 870,
+      "availWidth": 1512,
+      "devicePixelRatio": 2,
+      "height": 982,
+      "width": 1512
+    }
+  },
+  "checks": [
+    {
+      "detail": "object",
+      "id": "shell.ipc",
+      "ok": true
+    },
+    {
+      "detail": "http://localhost:5173",
+      "id": "secure-context",
+      "ok": true
+    },
+    {
+      "detail": "function",
+      "id": "media.getUserMedia",
+      "ok": true
+    },
+    {
+      "detail": "function",
+      "id": "media.enumerateDevices",
+      "ok": true
+    },
+    {
+      "detail": {
+        "echoCancellation": true,
+        "keys": 17,
+        "sampleRate": true
+      },
+      "id": "media.supportedConstraints",
+      "ok": true
+    },
+    {
+      "detail": {
+        "addTransceiver": "function",
+        "getStats": "function",
+        "setCodecPreferences": "undefined"
+      },
+      "id": "rtc.peerConnection",
+      "ok": true
+    },
+    {
+      "detail": {
+        "audio": [
+          "audio/opus",
+          "audio/red",
+          "audio/G722",
+          "audio/PCMU",
+          "audio/PCMA",
+          "audio/CN",
+          "audio/telephone-event",
+          "audio/telephone-event"
+        ],
+        "video": [
+          "video/H264",
+          "video/rtx",
+          "video/H264",
+          "video/H264",
+          "video/H264",
+          "video/H265",
+          "video/VP8",
+          "video/VP9",
+          "video/VP9",
+          "video/AV1",
+          "video/red",
+          "video/ulpfec"
+        ]
+      },
+      "id": "rtc.codecs",
+      "ok": true
+    },
+    {
+      "id": "rtc.dataChannel",
+      "ok": true
+    },
+    {
+      "detail": {
+        "audioWorklet": true,
+        "audioWorkletNode": true,
+        "sampleRate": 48000,
+        "state": "suspended"
+      },
+      "id": "audio.context",
+      "ok": true
+    },
+    {
+      "id": "audio.sharedArrayBuffer",
+      "ok": false
+    },
+    {
+      "detail": {
+        "webmOpus": true
+      },
+      "id": "media.recorder",
+      "ok": true
+    },
+    {
+      "detail": {
+        "canvasCapture": "function",
+        "tracks": 0
+      },
+      "id": "media.stream",
+      "ok": true
+    },
+    {
+      "detail": "function",
+      "id": "media.getDisplayMedia",
+      "ok": true
+    },
+    {
+      "detail": {
+        "displaySurface": true
+      },
+      "id": "media.displaySurface",
+      "ok": true
+    },
+    {
+      "detail": {
+        "instantiateStreaming": "function"
+      },
+      "id": "wasm.validate",
+      "ok": true
+    },
+    {
+      "detail": "instantiated",
+      "id": "wasm.instantiate",
+      "ok": true
+    },
+    {
+      "detail": "opened",
+      "id": "storage.indexedDb",
+      "ok": true
+    },
+    {
+      "detail": "round trip",
+      "id": "storage.localStorage",
+      "ok": true
+    },
+    {
+      "detail": {
+        "cookie": "present",
+        "cookieEnabled": true
+      },
+      "id": "storage.cookies",
+      "ok": true
+    },
+    {
+      "detail": {
+        "persisted": false
+      },
+      "id": "storage.persist",
+      "ok": true
+    },
+    {
+      "detail": {
+        "api": "function",
+        "permission": "default"
+      },
+      "id": "notifications",
+      "ok": true
+    },
+    {
+      "detail": {
+        "PushManager": false,
+        "ServiceWorkerRegistration": true
+      },
+      "id": "push",
+      "ok": false
+    },
+    {
+      "id": "serviceWorker",
+      "ok": true
+    }
+  ],
+  "failed": [
+    "audio.sharedArrayBuffer",
+    "push"
+  ],
+  "extra": {
+    "sessionRoundTrip": {
+      "documentCookie": "orbit-desktop-probe=1",
+      "loginStatus": 200,
+      "meStatus": 200,
+      "secondMe": "desksmoke"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merged into the generated Info.plist (tauri.conf.json → bundle.macOS).
+  Without these strings macOS kills the app the moment WKWebView asks for the microphone,
+  so they must be here even though Orbit only captures audio when someone joins a voice channel.
+-->
+<plist version="1.0">
+  <dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Orbit передаёт ваш голос участникам голосового канала.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Orbit показывает вашу камеру, когда вы включаете видео.</string>
+  </dict>
+</plist>

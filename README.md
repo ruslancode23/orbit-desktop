@@ -1,0 +1,82 @@
+# orbit-desktop
+
+Оболочка Orbit для Windows и macOS: Tauri 2, окно на тот же домен, что и в браузере.
+Веб-приложение — [`orbit-web`](../orbit-web), API — [`orbit-server`](../orbit-server); здесь только
+оболочка, без единой строки UI.
+
+Почему окно открывает удалённый домен, а не собранный фронт внутри бинарника, — [ADR-0006](docs/adr/0006-desktop-shell-remote-origin.md).
+
+## Что делает DESK-1
+
+- Окно открывает удалённый origin: в dev — `http://localhost:5173`, в релизе — домен, зашитый при сборке.
+- IPC (Tauri capabilities) разрешён только своим origin'ам. Встроенная страница-заглушка и чужие
+  сайты в этом окне команд не получают.
+- Проба для spike: `ORBIT_DESKTOP_PROBE=1` печатает в stdout измеренные возможности WebView
+  (микрофон, экран, WASM, IndexedDB, WebRTC, AudioWorklet) — из них собрана таблица
+  [docs/desk-1-spike.md](docs/desk-1-spike.md).
+
+## Запуск
+
+Нужны Node.js 22+, pnpm 11, Rust 1.82+ и (на macOS) Xcode Command Line Tools: `xcode-select --install`.
+
+```bash
+pnpm install
+cd ../orbit-web && pnpm dev      # отдельный терминал, http://localhost:5173
+pnpm dev                         # в этом репозитории
+```
+
+`pnpm dev` собирает debug-оболочку и открывает окно на Vite. Без запущенного orbit-web окно
+покажет ошибку загрузки — это вариант A из ADR-0006, офлайн-оболочки нет.
+
+Сборка под домен:
+
+```bash
+ORBIT_DESKTOP_ORIGIN=https://orbit.example pnpm build
+```
+
+Сборка проверяет, что домен есть в `src-tauri/capabilities/main-remote.json`: без этого окно
+открылось бы без IPC, а это видно только по отвалившимся уведомлениям и автозапуску.
+
+## Origin
+
+| Откуда берётся | Значение | Когда |
+| --- | --- | --- |
+| `ORBIT_DESKTOP_URL` | любой http(s) адрес | всегда главнее остальных, для dev и QA |
+| `http://localhost:5173` | Vite в orbit-web | debug-сборка без переменных |
+| `ORBIT_DESKTOP_ORIGIN` | домен, зашитый в бинарь | release-сборка |
+| — | локальная страница-объяснение | домена нет |
+
+`https://orbit.invalid` в capability — заглушка (RFC 2606, домен не существует). Настоящий домен
+появится вместе с прод-стендом (REL-3); до него desktop живёт на dev-сборках.
+
+## Скрипты
+
+| Команда | Что делает |
+| --- | --- |
+| `pnpm dev` | debug-сборка и окно на Vite |
+| `pnpm build` | release-сборка `.app`/`.dmg` (macOS) |
+| `pnpm build:debug` | debug-сборка приложения и бандла |
+| `pnpm check` | `cargo fmt --check`, clippy с `-D warnings`, тесты — как в CI |
+| `pnpm test` | юнит-тесты Rust (в том числе выбор origin) |
+| `pnpm icon` | перегенерировать иконки из исходника |
+
+## Устройство
+
+```
+src-tauri/
+  src/main.rs      точка входа: окно, IPC, страница-заглушка
+  src/origin.rs    откуда берётся адрес окна (с тестами)
+  src/probe.rs     проба для spike, только debug
+  spike/probe.js   что именно спрашиваем у WebView
+  capabilities/    кому разрешён IPC: main-remote.json
+  tauri.conf.json  окно, бандл, CSP
+  Info.plist       NSMicrophoneUsageDescription и NSCameraUsageDescription
+shell/index.html   страница-заглушка, когда домен не задан
+docs/              ADR и отчёт по spike
+```
+
+## Что дальше
+
+Порядок задач — в `desktop-tasks.md` в корне рабочего пространства: DESK-2 (голос в фоне),
+DESK-3 (`createTauriPlatform()`), DESK-5 (трей), DESK-9…11 (CI, подпись, автообновление).
+Windows-сборка идёт только в GitHub Actions: локальную кросс-сборку не делаем.
