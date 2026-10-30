@@ -17,7 +17,9 @@
         "minWidth": 960,
         "minHeight": 600,
         "center": true,
-        "resizable": true
+        "resizable": true,
+        "backgroundThrottling": "disabled",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows"
       }
     ],
     "security": {

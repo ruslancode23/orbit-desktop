@@ -50,6 +50,10 @@ Node 22+, pnpm 11, Rust 1.82+, на macOS — Xcode Command Line Tools. Lockfile
   меняешь правила выбора — меняй тесты.
 - Окно проверяется руками на macOS: `ORBIT_DESKTOP_PROBE=1 pnpm dev` печатает JSON с
   возможностями WebView. Это дешёвый способ узнать, что WebView умеет, не открывая devtools.
+- `ORBIT_DESKTOP_TICKS=1 pnpm dev` сворачивает окно на 75 секунд и печатает счётчик тиков:
+  так проверяется, троттлит ли WebView таймеры в скрытом окне (DESK-2,
+  [docs/desk-2-hidden-window.md](docs/desk-2-hidden-window.md)). `ORBIT_DESKTOP_TICKS_SECONDS`
+  меняет длительность.
 - Windows локально не собирается осознанно: сборка идёт в GitHub Actions (`windows-latest`),
   установщик оттуда ставится на машину вручную. Кросс-сборку (`cargo-xwin`) не заводим.
 - Сквозные сценарии (вход, чат, голос, экран) — вручную по чеклисту

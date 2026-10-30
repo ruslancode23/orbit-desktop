@@ -47,7 +47,13 @@ fn main() {
             let builder =
                 builder.on_page_load(|window, payload| probe::on_page_load(&window, &payload));
 
-            builder.build()?;
+            let window = builder.build()?;
+
+            #[cfg(debug_assertions)]
+            if probe::ticks_enabled() {
+                probe::watch_timers(&window);
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())
