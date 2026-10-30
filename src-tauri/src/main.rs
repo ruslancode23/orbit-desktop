@@ -4,7 +4,9 @@ mod origin;
 #[cfg(debug_assertions)]
 mod probe;
 
-use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
+#[cfg(target_os = "macos")]
+use tauri::Manager;
+use tauri::{RunEvent, WebviewUrl, WebviewWindowBuilder};
 
 fn main() {
     let target = origin::resolve();
@@ -67,16 +69,24 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("Orbit desktop failed to start");
 
-    app.run(|app, event| {
-        // A notification click (or a dock/taskbar click) activates the app; make sure the window
-        // is on screen and focused instead of staying minimised. Desktop notifications do not
-        // report clicks to the plugin, so this is the closest the shell can get.
-        if let RunEvent::Reopen { .. } = event {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
+    app.run(on_run_event);
+}
+
+/// A notification or dock click activates the app, but a window that was minimised stays in the
+/// Dock, so it is brought back explicitly. The web side already focuses the window from the
+/// notification's own action; this covers the activations the OS reports instead.
+///
+/// `Reopen` exists only on macOS — Windows brings the app forward itself on a toast click.
+fn on_run_event(app: &tauri::AppHandle, event: RunEvent) {
+    #[cfg(target_os = "macos")]
+    if let RunEvent::Reopen { .. } = event {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.show();
+            let _ = window.set_focus();
         }
-    });
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, event);
 }
