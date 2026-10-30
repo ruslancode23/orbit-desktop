@@ -1,11 +1,19 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-remote",
-  "description": "IPC для веб-приложения Orbit. Разрешён только своему origin: ни встроенная страница-заглушка, ни чужие сайты в этом окне IPC не получают.",
+  "description": "IPC для веб-приложения Orbit. Разрешён только своему origin: ни встроенная страница-заглушка, ни чужие сайты в этом окне IPC не получают. Из прав — только то, что нужно PlatformAdapter: уведомления, автозапуск, сведения об ОС и версия приложения.",
   "local": false,
   "windows": ["main"],
   "remote": {
     "urls": ["http://localhost:5173", "https://orbit.invalid"]
   },
-  "permissions": ["allow-report-spike"]
+  "permissions": [
+    "allow-report-spike",
+    "core:app:allow-version",
+    "core:window:allow-set-focus",
+    "core:window:allow-show",
+    "core:window:allow-unminimize",
+    "notification:default",
+    "autostart:default"
+  ]
 }

@@ -210,6 +210,58 @@
 
   await check('serviceWorker', () => 'serviceWorker' in navigator)
 
+  // --- the shell's plugins: what DESK-3 added for PlatformAdapter ----------
+  await check('shell.plugins', async () => {
+    const internals = window.__TAURI_INTERNALS__
+    if (!internals || typeof internals.invoke !== 'function') {
+      return [false, 'no IPC']
+    }
+    const call = async (command) => {
+      try {
+        return { ok: true, value: await internals.invoke(command) }
+      } catch (error) {
+        return { ok: false, error: String(error) }
+      }
+    }
+    // plugin-os answers from constants injected into the page, not over IPC; the app reads
+    // the same object, so checking it is checking what PlatformAdapter will see.
+    const osInternals = window.__TAURI_OS_PLUGIN_INTERNALS__
+    const os = osInternals
+      ? {
+          ok: true,
+          value: {
+            platform: osInternals.platform,
+            version: osInternals.version,
+            arch: osInternals.arch,
+          },
+        }
+      : { ok: false, error: 'no __TAURI_OS_PLUGIN_INTERNALS__' }
+    const [notification, autostart, appVersion] = await Promise.all([
+      call('plugin:notification|is_permission_granted'),
+      call('plugin:autostart|is_enabled'),
+      call('plugin:app|version'),
+    ])
+    return [
+      os.ok && notification.ok && autostart.ok && appVersion.ok,
+      { os, notification, autostart, appVersion },
+    ]
+  })
+
+  // --- did the app itself come up? ----------------------------------------
+  // The desktop adapter is loaded before the first render; if that import throws, React never
+  // mounts and the window stays empty. Waiting a moment separates "not yet" from "never".
+  await check('app.rendered', async () => {
+    const deadline = Date.now() + 3000
+    while (Date.now() < deadline) {
+      const rootElement = document.getElementById('root')
+      if (rootElement && rootElement.childElementCount > 0) {
+        return [true, { children: rootElement.childElementCount }]
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    return [false, 'the app did not render']
+  })
+
   // --- the environment, for the report ------------------------------------
   const report = {
     origin: location.origin,

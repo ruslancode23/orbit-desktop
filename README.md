@@ -15,6 +15,22 @@
   (микрофон, экран, WASM, IndexedDB, WebRTC, AudioWorklet) — из них собрана таблица
   [docs/desk-1-spike.md](docs/desk-1-spike.md).
 
+## Что оболочка даёт web (DESK-3)
+
+Веб-приложение узнаёт оболочку по `window.__TAURI_INTERNALS__` и подменяет `PlatformAdapter`
+на `createTauriPlatform()` (`orbit-web/src/shared/platform/tauri-platform.ts`). Из нативного сюда
+приходит ровно четыре вещи, и все они выданы узкой capability:
+
+| Что | Плагин | Права |
+| --- | --- | --- |
+| Системные уведомления, клик возвращает окно | `tauri-plugin-notification` | `notification:default`, `core:window:allow-set-focus/show/unminimize` |
+| Автозапуск при входе в систему | `tauri-plugin-autostart` | `autostart:default` |
+| Версия приложения | ядро Tauri | `core:app:allow-version` |
+| ОС и архитектура для отчёта об ошибке | `tauri-plugin-os` | ничего: значения вшиты в страницу при сборке |
+
+`install` и `push` в оболочке отвечают «не поддерживается»: PWA-установка и Web Push — браузерные
+механизмы, desktop показывает уведомления сам (DESK-4).
+
 ## Запуск
 
 Нужны Node.js 22+, pnpm 11, Rust 1.82+ и (на macOS) Xcode Command Line Tools: `xcode-select --install`.
