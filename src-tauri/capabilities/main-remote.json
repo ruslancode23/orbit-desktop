@@ -10,7 +10,10 @@
   "permissions": [
     "allow-report-spike",
     "allow-set-unread",
+    "allow-set-push-to-talk",
     "core:app:allow-version",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "core:window:allow-set-focus",
     "core:window:allow-show",
     "core:window:allow-unminimize",

@@ -284,6 +284,24 @@
     }
   })
 
+  // --- push-to-talk: can the shell own a shortcut? (DESK-6) ---------------
+  await check('shell.pushToTalk', async () => {
+    const internals = window.__TAURI_INTERNALS__
+    if (!internals || typeof internals.invoke !== 'function') {
+      return [false, 'no IPC']
+    }
+    try {
+      const taken = await internals.invoke('set_push_to_talk', {
+        accelerator: 'CommandOrControl+Shift+Backquote',
+      })
+      await internals.invoke('set_push_to_talk', { accelerator: null })
+      // The command answers with the chord it owns, or null when it let go.
+      return [taken !== null && taken !== false, { owned: taken }]
+    } catch (error) {
+      return [false, String(error)]
+    }
+  })
+
   // --- did the app itself come up? ----------------------------------------
   // The desktop adapter is loaded before the first render; if that import throws, React never
   // mounts and the window stays empty. Waiting a moment separates "not yet" from "never".

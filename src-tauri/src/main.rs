@@ -4,6 +4,7 @@ mod badge;
 mod origin;
 #[cfg(debug_assertions)]
 mod probe;
+mod shortcut;
 mod tray;
 mod window;
 
@@ -28,6 +29,7 @@ fn main() {
         .plugin(tauri_plugin_window_state::Builder::default().build())
         // DESK-3: the three things the web app cannot do itself. Notifications and autostart are
         // reached through PlatformAdapter; the OS details feed `system.describe()` in bug reports.
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_autostart::init(
@@ -41,12 +43,16 @@ fn main() {
     {
         builder = builder.invoke_handler(tauri::generate_handler![
             probe::report_spike,
-            badge::set_unread
+            badge::set_unread,
+            shortcut::set_push_to_talk
         ]);
     }
     #[cfg(not(debug_assertions))]
     {
-        builder = builder.invoke_handler(tauri::generate_handler![badge::set_unread]);
+        builder = builder.invoke_handler(tauri::generate_handler![
+            badge::set_unread,
+            shortcut::set_push_to_talk
+        ]);
     }
 
     let app = builder
@@ -97,11 +103,16 @@ fn main() {
 ///
 /// `Reopen` exists only on macOS — Windows brings the app forward itself on a toast click.
 fn on_run_event(app: &tauri::AppHandle, event: RunEvent) {
+    // A held key must not outlive the app: the page would keep the microphone open.
+    if matches!(&event, RunEvent::ExitRequested { .. }) {
+        shortcut::release(app);
+    }
+
     #[cfg(target_os = "macos")]
-    if let RunEvent::Reopen { .. } = event {
+    if matches!(&event, RunEvent::Reopen { .. }) {
         window::show_main(app);
     }
 
     #[cfg(not(target_os = "macos"))]
-    let _ = (app, event);
+    let _ = app;
 }
