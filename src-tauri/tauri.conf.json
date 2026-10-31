@@ -23,7 +23,9 @@
       }
     ],
     "security": {
-      "capabilities": ["main-remote"],
+      "capabilities": [
+        "main-remote"
+      ],
       "csp": null
     }
   },
@@ -40,7 +42,9 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "minimumSystemVersion": "12.0"
+      "minimumSystemVersion": "12.0",
+      "entitlements": "Entitlements.plist",
+      "hardenedRuntime": true
     }
   }
 }

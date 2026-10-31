@@ -141,6 +141,28 @@ ORBIT_DESKTOP_ORIGIN=https://orbit.example pnpm build
 | `pnpm test` | юнит-тесты Rust (в том числе выбор origin) |
 | `pnpm icon` | перегенерировать иконки из исходника |
 
+## Релизы и подпись
+
+Сборки делает workflow [`Release`](.github/workflows/release.yml): по тегу `v*` он собирает
+установщики и складывает их **в черновик** релиза, ручной запуск (`workflow_dispatch`) оставляет
+только артефакты на прогоне. macOS собирается universal (`--target universal-apple-darwin`) —
+один `.dmg` для Apple Silicon и Intel; Windows — NSIS `.exe` и `.msi`.
+
+Домен вшивается в бинарь: `ORBIT_DESKTOP_ORIGIN` берётся из переменной репозитория
+(`vars.ORBIT_DESKTOP_ORIGIN`), по умолчанию — заглушка `https://orbit.invalid`. Если задать настоящий
+домен, его надо добавить и в `src-tauri/capabilities/main-remote.json`, иначе сборка упадёт — это
+нарочно.
+
+**Подписи пока нет** (решение от 27.10): бета без сертификатов, пользователю об этом говорит
+[.github/release-notes.md](.github/release-notes.md). Для macOS заготовлены `hardenedRuntime` и
+[`Entitlements.plist`](src-tauri/Entitlements.plist) с микрофоном и камерой — они начнут действовать,
+когда появится Developer ID. Что нужно, чтобы подписать:
+
+| Платформа | Что купить/получить | Куда положить |
+| --- | --- | --- |
+| macOS | Apple Developer Program ($99/год), Developer ID Application + нотаризация | секреты `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` |
+| Windows | Azure Trusted Signing или OV-сертификат на зарубежное юрлицо | секреты сервиса подписи, шаг подписи в workflow |
+
 ## Устройство
 
 ```
