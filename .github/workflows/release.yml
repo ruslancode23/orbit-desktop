@@ -47,9 +47,10 @@ jobs:
         with:
           name: orbit-desktop-${{ matrix.target || 'windows' }}
           if-no-files-found: error
+          # Only what a person downloads: the `.app` inside the dmg is the same bundle and would
+          # triple the artifact size for nothing.
           path: |
             src-tauri/target/**/bundle/dmg/*.dmg
-            src-tauri/target/**/bundle/macos/*.app
             src-tauri/target/**/bundle/nsis/*.exe
             src-tauri/target/**/bundle/msi/*.msi
 
