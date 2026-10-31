@@ -13,8 +13,9 @@ fn main() {
     guard_origin_is_in_capability();
 
     tauri_build::try_build(
-        tauri_build::Attributes::new()
-            .app_manifest(tauri_build::AppManifest::new().commands(&["report_spike"])),
+        tauri_build::Attributes::new().app_manifest(
+            tauri_build::AppManifest::new().commands(&["report_spike", "set_unread"]),
+        ),
     )
     .expect("tauri-build failed");
 }

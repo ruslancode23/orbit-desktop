@@ -269,6 +269,21 @@
     })
   }
 
+  // --- the unread badge on the icon (DESK-5) ------------------------------
+  await check('shell.badge', async () => {
+    const internals = window.__TAURI_INTERNALS__
+    if (!internals || typeof internals.invoke !== 'function') {
+      return [false, 'no IPC']
+    }
+    try {
+      await internals.invoke('set_unread', { count: 2 })
+      await internals.invoke('set_unread', { count: 0 })
+      return [true, 'set and cleared']
+    } catch (error) {
+      return [false, String(error)]
+    }
+  })
+
   // --- did the app itself come up? ----------------------------------------
   // The desktop adapter is loaded before the first render; if that import throws, React never
   // mounts and the window stays empty. Waiting a moment separates "not yet" from "never".

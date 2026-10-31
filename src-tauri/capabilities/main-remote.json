@@ -9,6 +9,7 @@
   },
   "permissions": [
     "allow-report-spike",
+    "allow-set-unread",
     "core:app:allow-version",
     "core:window:allow-set-focus",
     "core:window:allow-show",

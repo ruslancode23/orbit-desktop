@@ -1,11 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod badge;
 mod origin;
 #[cfg(debug_assertions)]
 mod probe;
+mod tray;
+mod window;
 
-#[cfg(target_os = "macos")]
-use tauri::Manager;
 use tauri::{RunEvent, WebviewUrl, WebviewWindowBuilder};
 
 fn main() {
@@ -18,6 +19,13 @@ fn main() {
     }
 
     let mut builder = tauri::Builder::default()
+        // The single-instance guard has to be registered first: a second launch must reach the
+        // window that already exists instead of starting another copy of the app.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            window::show_main(app);
+        }))
+        // Size, place and maximised state survive a restart.
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         // DESK-3: the three things the web app cannot do itself. Notifications and autostart are
         // reached through PlatformAdapter; the OS details feed `system.describe()` in bug reports.
         .plugin(tauri_plugin_notification::init())
@@ -31,7 +39,14 @@ fn main() {
     // so remote content cannot reach it even before the capability list is consulted.
     #[cfg(debug_assertions)]
     {
-        builder = builder.invoke_handler(tauri::generate_handler![probe::report_spike]);
+        builder = builder.invoke_handler(tauri::generate_handler![
+            probe::report_spike,
+            badge::set_unread
+        ]);
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        builder = builder.invoke_handler(tauri::generate_handler![badge::set_unread]);
     }
 
     let app = builder
@@ -59,6 +74,10 @@ fn main() {
 
             let window = builder.build()?;
 
+            // Closing the window leaves the app in the tray; quitting is a tray menu item.
+            window::hide_on_close(&window);
+            tray::install(app.handle())?;
+
             #[cfg(debug_assertions)]
             if probe::ticks_enabled() {
                 probe::watch_timers(&window);
@@ -80,11 +99,7 @@ fn main() {
 fn on_run_event(app: &tauri::AppHandle, event: RunEvent) {
     #[cfg(target_os = "macos")]
     if let RunEvent::Reopen { .. } = event {
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.unminimize();
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
+        window::show_main(app);
     }
 
     #[cfg(not(target_os = "macos"))]
