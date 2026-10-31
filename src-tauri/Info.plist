@@ -11,5 +11,17 @@
     <string>Orbit передаёт ваш голос участникам голосового канала.</string>
     <key>NSCameraUsageDescription</key>
     <string>Orbit показывает вашу камеру, когда вы включаете видео.</string>
+    <!-- DESK-8: invites open from a browser as orbit://invite/<code>. -->
+    <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLName</key>
+        <string>app.orbit.desktop</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>orbit</string>
+        </array>
+      </dict>
+    </array>
   </dict>
 </plist>

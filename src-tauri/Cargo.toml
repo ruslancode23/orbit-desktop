@@ -19,6 +19,9 @@ serde_json = "1"
 tauri-plugin-notification = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-os = "2"
+# DESK-8: external links go to the OS browser, orbit:// links come back into the app.
+tauri-plugin-opener = "2"
+tauri-plugin-deep-link = "2"
 # DESK-7: secret chat keys — one master key in the OS keychain, values in AES-GCM files.
 keyring-core = "1"
 aes-gcm = "0.10"

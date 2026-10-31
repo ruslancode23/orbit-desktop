@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod badge;
+mod links;
 mod origin;
 #[cfg(debug_assertions)]
 mod probe;
@@ -31,6 +32,9 @@ fn main() {
         // DESK-3: the three things the web app cannot do itself. Notifications and autostart are
         // reached through PlatformAdapter; the OS details feed `system.describe()` in bug reports.
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        // DESK-8: external links go to the OS browser, orbit:// links come back into the app.
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_autostart::init(
@@ -89,11 +93,33 @@ fn main() {
                 origin::Target::Missing => WebviewUrl::App("index.html".into()),
             };
 
-            let builder = WebviewWindowBuilder::from_config(app.handle(), &window_config)?;
+            // What counts as "our" origin for the navigation guard. The bundled fallback page
+            // has no links of its own, so its scheme stands in for the origin.
+            let own_origin = match &target {
+                origin::Target::Remote(url) => url.clone(),
+                origin::Target::Missing => "tauri://localhost".to_string(),
+            };
+            let navigation_app = app.handle().clone();
+            let window_app = app.handle().clone();
 
-            #[cfg(debug_assertions)]
-            let builder =
-                builder.on_page_load(|window, payload| probe::on_page_load(&window, &payload));
+            let builder = WebviewWindowBuilder::from_config(app.handle(), &window_config)?
+                .on_navigation(move |url| {
+                    if links::is_external(url, &own_origin) {
+                        links::open_external(&navigation_app, url.as_str());
+                        return false;
+                    }
+                    true
+                })
+                .on_new_window(move |url, _features| {
+                    // `target="_blank"` in the page: the browser owns that tab, not this window.
+                    links::open_external(&window_app, url.as_str());
+                    tauri::webview::NewWindowResponse::Deny
+                })
+                .on_page_load(|window, payload| {
+                    links::on_page_load(window.app_handle(), payload.event());
+                    #[cfg(debug_assertions)]
+                    probe::on_page_load(&window, &payload);
+                });
 
             let window = builder.build()?;
 
@@ -107,6 +133,8 @@ fn main() {
                     eprintln!("[orbit-desktop] secret store is unavailable: {error:?}");
                 }
             }
+
+            links::install(app.handle())?;
 
             // Closing the window leaves the app in the tray; quitting is a tray menu item.
             window::hide_on_close(&window);
