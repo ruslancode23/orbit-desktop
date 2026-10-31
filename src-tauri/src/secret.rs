@@ -37,6 +37,8 @@ const NONCE_LEN: usize = 12;
 /// A value is a JSON document; anything larger is a bug on the caller's side, not a chat message.
 const MAX_VALUE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_KEY_LEN: usize = 200;
+/// Attachments are stored next to their message, so a single blob may be a whole file.
+const MAX_BLOB_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Debug)]
 pub enum SecretError {
@@ -140,6 +142,40 @@ impl SecretStore {
         Ok(bytes)
     }
 
+    /// Raw bytes with an explicit AAD: attachments are sealed exactly like values.
+    fn seal_bytes(&self, aad: &[u8], plain: &[u8]) -> Result<Vec<u8>, SecretError> {
+        let cipher = Aes256Gcm::new_from_slice(&self.key)
+            .map_err(|error| SecretError::Unavailable(error.to_string()))?;
+        let nonce = random_nonce()?;
+        let body = cipher
+            .encrypt(Nonce::from_slice(&nonce), Payload { msg: plain, aad })
+            .map_err(|_| SecretError::Corrupt)?;
+        let mut bytes = Vec::with_capacity(4 + 1 + NONCE_LEN + body.len());
+        bytes.extend_from_slice(MAGIC);
+        bytes.push(VERSION);
+        bytes.extend_from_slice(&nonce);
+        bytes.extend_from_slice(&body);
+        Ok(bytes)
+    }
+
+    fn open_bytes_raw(&self, aad: &[u8], bytes: &[u8]) -> Result<Vec<u8>, SecretError> {
+        if bytes.len() <= 4 + 1 + NONCE_LEN || &bytes[..4] != MAGIC || bytes[4] != VERSION {
+            return Err(SecretError::Corrupt);
+        }
+        let nonce = &bytes[5..5 + NONCE_LEN];
+        let cipher = Aes256Gcm::new_from_slice(&self.key)
+            .map_err(|error| SecretError::Unavailable(error.to_string()))?;
+        cipher
+            .decrypt(
+                Nonce::from_slice(nonce),
+                Payload {
+                    msg: &bytes[5 + NONCE_LEN..],
+                    aad,
+                },
+            )
+            .map_err(|_| SecretError::Corrupt)
+    }
+
     fn open_bytes(
         &self,
         scope: &str,
@@ -204,13 +240,66 @@ impl SecretStore {
         write_atomically(&path, &bytes)
     }
 
-    fn remove(&self, scope: &str, key: &str) -> Result<(), SecretError> {
+    /// Where the attachments of one value live: one file per blob, encrypted like the value.
+    fn blob_dir(&self, scope: &str, key: &str) -> (PathBuf, String) {
+        let (path, digest) = self.target(scope, key);
+        let dir = path.with_extension("blobs");
+        (dir, digest)
+    }
+
+    fn blob_put(&self, scope: &str, key: &str, name: &str, data: &[u8]) -> Result<(), SecretError> {
         validate(scope, key)?;
-        let (path, _) = self.target(scope, key);
+        validate_name(name)?;
+        if data.len() > MAX_BLOB_BYTES {
+            return Err(SecretError::Invalid("blob is too large".to_string()));
+        }
+        let (dir, digest) = self.blob_dir(scope, key);
+        let bytes = self.seal_bytes(&blob_aad(scope, &digest, name), data)?;
         let _guard = self
             .gate
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        write_atomically(&dir.join(format!("{name}.bin")), &bytes)
+    }
+
+    fn blob_get(&self, scope: &str, key: &str, name: &str) -> Result<Option<Vec<u8>>, SecretError> {
+        validate(scope, key)?;
+        validate_name(name)?;
+        let (dir, digest) = self.blob_dir(scope, key);
+        let bytes = match fs::read(dir.join(format!("{name}.bin"))) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(SecretError::Unavailable(error.to_string())),
+        };
+        self.open_bytes_raw(&blob_aad(scope, &digest, name), &bytes)
+            .map(Some)
+    }
+
+    fn blob_remove(&self, scope: &str, key: &str, name: &str) -> Result<(), SecretError> {
+        validate(scope, key)?;
+        validate_name(name)?;
+        let (dir, _) = self.blob_dir(scope, key);
+        let _guard = self
+            .gate
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        match fs::remove_file(dir.join(format!("{name}.bin"))) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(SecretError::Unavailable(error.to_string())),
+        }
+    }
+
+    fn remove(&self, scope: &str, key: &str) -> Result<(), SecretError> {
+        validate(scope, key)?;
+        let (path, _) = self.target(scope, key);
+        let (blobs, _) = self.blob_dir(scope, key);
+        let _guard = self
+            .gate
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // The attachments belong to the value: one removed message must not leave files behind.
+        let _ = fs::remove_dir_all(blobs);
         match fs::remove_file(path) {
             Ok(()) => Ok(()),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -267,6 +356,23 @@ fn validate(scope: &str, key: &str) -> Result<(), SecretError> {
     }
     if key.len() > MAX_KEY_LEN || key.contains('/') || key.contains('\\') || key.contains('\0') {
         return Err(SecretError::Invalid("bad key".to_string()));
+    }
+    Ok(())
+}
+
+fn blob_aad(scope: &str, digest: &str, name: &str) -> Vec<u8> {
+    format!("orbit-secret/v1\0blob\0{scope}\0{digest}\0{name}").into_bytes()
+}
+
+/// A blob name comes from the page, so it may not walk out of its directory either.
+fn validate_name(name: &str) -> Result<(), SecretError> {
+    if name.is_empty()
+        || name.len() > MAX_KEY_LEN
+        || name.contains('/')
+        || name.contains('\\')
+        || name.contains('\0')
+    {
+        return Err(SecretError::Invalid("bad blob name".to_string()));
     }
     Ok(())
 }
@@ -435,6 +541,52 @@ mod commands {
     }
 
     #[tauri::command]
+    pub async fn secret_blob_put(
+        store: State<'_, Arc<SecretStore>>,
+        scope: String,
+        key: String,
+        name: String,
+        data: String,
+    ) -> Result<(), SecretError> {
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        let bytes = STANDARD
+            .decode(data)
+            .map_err(|_| SecretError::Invalid("blob is not base64".to_string()))?;
+        let store = Arc::clone(&store);
+        tauri::async_runtime::spawn_blocking(move || store.blob_put(&scope, &key, &name, &bytes))
+            .await
+            .map_err(|error| SecretError::Unavailable(error.to_string()))?
+    }
+
+    #[tauri::command]
+    pub async fn secret_blob_get(
+        store: State<'_, Arc<SecretStore>>,
+        scope: String,
+        key: String,
+        name: String,
+    ) -> Result<Option<String>, SecretError> {
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        let store = Arc::clone(&store);
+        tauri::async_runtime::spawn_blocking(move || store.blob_get(&scope, &key, &name))
+            .await
+            .map_err(|error| SecretError::Unavailable(error.to_string()))?
+            .map(|found| found.map(|bytes| STANDARD.encode(bytes)))
+    }
+
+    #[tauri::command]
+    pub async fn secret_blob_remove(
+        store: State<'_, Arc<SecretStore>>,
+        scope: String,
+        key: String,
+        name: String,
+    ) -> Result<(), SecretError> {
+        let store = Arc::clone(&store);
+        tauri::async_runtime::spawn_blocking(move || store.blob_remove(&scope, &key, &name))
+            .await
+            .map_err(|error| SecretError::Unavailable(error.to_string()))?
+    }
+
+    #[tauri::command]
     pub async fn secret_clear(
         store: State<'_, Arc<SecretStore>>,
         scope: String,
@@ -586,6 +738,59 @@ mod tests {
             .expect("set");
         let value = store.get("secret", "account").expect("get").expect("value");
         assert_eq!(value["data"].as_str().map(str::len), Some(20_000));
+    }
+
+    #[test]
+    fn keeps_an_attachment_next_to_its_value() {
+        let (store, _dir) = store();
+        store
+            .set("secret-messages", "chat-1", json!({ "text": "hi" }))
+            .expect("set");
+        store
+            .blob_put("secret-messages", "chat-1", "file-1", b"attachment bytes")
+            .expect("put");
+
+        assert_eq!(
+            store
+                .blob_get("secret-messages", "chat-1", "file-1")
+                .expect("get"),
+            Some(b"attachment bytes".to_vec())
+        );
+        assert_eq!(
+            store
+                .blob_get("secret-messages", "chat-1", "nothing")
+                .expect("get"),
+            None
+        );
+    }
+
+    #[test]
+    fn removing_a_value_removes_its_attachments() {
+        let (store, _dir) = store();
+        store
+            .set("secret-messages", "chat-1", json!(1))
+            .expect("set");
+        store
+            .blob_put("secret-messages", "chat-1", "f", b"x")
+            .expect("put");
+
+        store.remove("secret-messages", "chat-1").expect("remove");
+
+        assert_eq!(
+            store
+                .blob_get("secret-messages", "chat-1", "f")
+                .expect("get"),
+            None
+        );
+    }
+
+    #[test]
+    fn refuses_path_like_blob_names() {
+        let (store, _dir) = store();
+        assert!(matches!(
+            store.blob_put("secret", "account", "../escape", b"x"),
+            Err(SecretError::Invalid(_))
+        ));
     }
 
     #[test]

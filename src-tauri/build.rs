@@ -22,6 +22,9 @@ fn main() {
             "secret_remove",
             "secret_keys",
             "secret_clear",
+            "secret_blob_put",
+            "secret_blob_get",
+            "secret_blob_remove",
         ]),
     ))
     .expect("tauri-build failed");

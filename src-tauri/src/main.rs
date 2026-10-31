@@ -50,7 +50,10 @@ fn main() {
             secret::secret_set,
             secret::secret_remove,
             secret::secret_keys,
-            secret::secret_clear
+            secret::secret_clear,
+            secret::secret_blob_put,
+            secret::secret_blob_get,
+            secret::secret_blob_remove
         ]);
     }
     #[cfg(not(debug_assertions))]
@@ -62,7 +65,10 @@ fn main() {
             secret::secret_set,
             secret::secret_remove,
             secret::secret_keys,
-            secret::secret_clear
+            secret::secret_clear,
+            secret::secret_blob_put,
+            secret::secret_blob_get,
+            secret::secret_blob_remove
         ]);
     }
 

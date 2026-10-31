@@ -313,7 +313,23 @@
       const read = await internals.invoke('secret_get', { scope: 'secret', key: 'probe' })
       await internals.invoke('secret_remove', { scope: 'secret', key: 'probe' })
       const again = await internals.invoke('secret_get', { scope: 'secret', key: 'probe' })
-      return [read?.n === 1 && again === null, { read, afterRemove: again }]
+      // Attachments travel separately: a value keeps only a reference to the file.
+      await internals.invoke('secret_blob_put', {
+        scope: 'secret-messages',
+        key: 'probe',
+        name: 'b1',
+        data: btoa('attachment'),
+      })
+      const blob = await internals.invoke('secret_blob_get', {
+        scope: 'secret-messages',
+        key: 'probe',
+        name: 'b1',
+      })
+      await internals.invoke('secret_clear', { scope: 'secret-messages' })
+      return [
+        read?.n === 1 && again === null && blob === btoa('attachment'),
+        { read, afterRemove: again, blob },
+      ]
     } catch (error) {
       return [false, String(error)]
     }
