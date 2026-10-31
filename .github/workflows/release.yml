@@ -1,0 +1,78 @@
+name: Release
+
+# Installers for both desktop targets. Nothing is published from a branch: a tag creates a draft
+# release, a manual run only leaves artifacts on the workflow run.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            # One binary for Apple Silicon and Intel: the beta has no separate downloads.
+            target: universal-apple-darwin
+            args: --target universal-apple-darwin
+          - os: windows-latest
+            target: ''
+            args: ''
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          # The macOS job builds both architectures; the Windows one uses the host target.
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+
+      # The origin is baked into the binary: a release cannot fall back to localhost, and the
+      # build fails if the domain is not in capabilities/main-remote.json (build.rs guards that).
+      - run: pnpm tauri build ${{ matrix.args }}
+        env:
+          ORBIT_DESKTOP_ORIGIN: ${{ vars.ORBIT_DESKTOP_ORIGIN || 'https://orbit.invalid' }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orbit-desktop-${{ matrix.target || 'windows' }}
+          if-no-files-found: error
+          path: |
+            src-tauri/target/**/bundle/dmg/*.dmg
+            src-tauri/target/**/bundle/macos/*.app
+            src-tauri/target/**/bundle/nsis/*.exe
+            src-tauri/target/**/bundle/msi/*.msi
+
+  # A tag turns the artifacts into a draft release: someone reads the notes and publishes it,
+  # because an unsigned build is still what beta testers have to be warned about.
+  release:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(find artifacts -type f -print0)
+          gh release create "${{ github.ref_name }}" \
+            --draft \
+            --title "Orbit ${{ github.ref_name }}" \
+            --notes-file .github/release-notes.md \
+            "${files[@]}"
