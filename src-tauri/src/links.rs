@@ -85,6 +85,22 @@ fn emit<R: Runtime>(app: &AppHandle<R>, url: String) {
     }
 }
 
+/// Every real document load: from now on an event reaches the page. A link that arrived earlier
+/// is delivered here, because at startup nobody was listening yet.
+pub fn on_page_load<R: Runtime>(app: &AppHandle<R>, event: PageLoadEvent) {
+    if event != PageLoadEvent::Finished {
+        return;
+    }
+    READY.store(true, Ordering::SeqCst);
+    let pending = PENDING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .take();
+    if let Some(url) = pending {
+        emit(app, url);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,21 +141,5 @@ mod tests {
     #[test]
     fn a_broken_origin_does_not_open_the_gate() {
         assert!(is_external(&url("https://example.com"), "not a url"));
-    }
-}
-
-/// Every real document load: from now on an event reaches the page. A link that arrived earlier
-/// is delivered here, because at startup nobody was listening yet.
-pub fn on_page_load<R: Runtime>(app: &AppHandle<R>, event: PageLoadEvent) {
-    if event != PageLoadEvent::Finished {
-        return;
-    }
-    READY.store(true, Ordering::SeqCst);
-    let pending = PENDING
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .take();
-    if let Some(url) = pending {
-        emit(app, url);
     }
 }
