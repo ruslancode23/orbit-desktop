@@ -247,6 +247,28 @@
     ]
   })
 
+  // --- can the shell actually deliver a notification? (OPT-IN, DESK-4) ----
+  if (window.__ORBIT_NOTIFY_TEST__) {
+    await check('shell.notify', async () => {
+      const internals = window.__TAURI_INTERNALS__
+      if (!internals || typeof internals.invoke !== 'function') {
+        return [false, 'no IPC']
+      }
+      try {
+        await internals.invoke('plugin:notification|notify', {
+          options: {
+            id: 99001,
+            title: 'Orbit',
+            body: 'Проверка уведомлений из оболочки',
+          },
+        })
+        return [true, 'sent']
+      } catch (error) {
+        return [false, String(error)]
+      }
+    })
+  }
+
   // --- did the app itself come up? ----------------------------------------
   // The desktop adapter is loaded before the first render; if that import throws, React never
   // mounts and the window stays empty. Waiting a moment separates "not yet" from "never".

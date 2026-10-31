@@ -51,9 +51,20 @@ pub fn on_page_load(window: &WebviewWindow, payload: &PageLoadPayload<'_>) {
     }
     *probed = Some(url);
 
-    if let Err(error) = window.eval(PROBE) {
+    // The notification test is opt-in: it puts a real banner on the screen.
+    let script = if notify_probe_enabled() {
+        format!("window.__ORBIT_NOTIFY_TEST__ = true;\n{PROBE}")
+    } else {
+        PROBE.to_string()
+    };
+    if let Err(error) = window.eval(&script) {
         eprintln!("[orbit-desktop] probe was not injected: {error}");
     }
+}
+
+/// True when the operator asked the probe to show a real system notification (DESK-4).
+pub fn notify_probe_enabled() -> bool {
+    matches!(std::env::var("ORBIT_DESKTOP_NOTIFY").as_deref(), Ok("1"))
 }
 
 /// True when the operator asked to watch timers in a hidden window.
