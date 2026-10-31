@@ -4,11 +4,12 @@ mod badge;
 mod origin;
 #[cfg(debug_assertions)]
 mod probe;
+mod secret;
 mod shortcut;
 mod tray;
 mod window;
 
-use tauri::{RunEvent, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 
 fn main() {
     let target = origin::resolve();
@@ -44,14 +45,24 @@ fn main() {
         builder = builder.invoke_handler(tauri::generate_handler![
             probe::report_spike,
             badge::set_unread,
-            shortcut::set_push_to_talk
+            shortcut::set_push_to_talk,
+            secret::secret_get,
+            secret::secret_set,
+            secret::secret_remove,
+            secret::secret_keys,
+            secret::secret_clear
         ]);
     }
     #[cfg(not(debug_assertions))]
     {
         builder = builder.invoke_handler(tauri::generate_handler![
             badge::set_unread,
-            shortcut::set_push_to_talk
+            shortcut::set_push_to_talk,
+            secret::secret_get,
+            secret::secret_set,
+            secret::secret_remove,
+            secret::secret_keys,
+            secret::secret_clear
         ]);
     }
 
@@ -79,6 +90,17 @@ fn main() {
                 builder.on_page_load(|window, payload| probe::on_page_load(&window, &payload));
 
             let window = builder.build()?;
+
+            // The secret store opens once: the master key lives in the keychain, the values in
+            // files next to the app. Without it the app still runs — only secret chats are off.
+            match secret::SecretStore::open(app.handle()) {
+                Ok(store) => {
+                    app.manage(std::sync::Arc::new(store));
+                }
+                Err(error) => {
+                    eprintln!("[orbit-desktop] secret store is unavailable: {error:?}");
+                }
+            }
 
             // Closing the window leaves the app in the tray; quitting is a tray menu item.
             window::hide_on_close(&window);

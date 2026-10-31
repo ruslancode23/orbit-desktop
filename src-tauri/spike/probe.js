@@ -302,6 +302,23 @@
     }
   })
 
+  // --- the keychain-backed secret store (DESK-7) --------------------------
+  await check('shell.secret', async () => {
+    const internals = window.__TAURI_INTERNALS__
+    if (!internals || typeof internals.invoke !== 'function') {
+      return [false, 'no IPC']
+    }
+    try {
+      await internals.invoke('secret_set', { scope: 'secret', key: 'probe', value: { n: 1 } })
+      const read = await internals.invoke('secret_get', { scope: 'secret', key: 'probe' })
+      await internals.invoke('secret_remove', { scope: 'secret', key: 'probe' })
+      const again = await internals.invoke('secret_get', { scope: 'secret', key: 'probe' })
+      return [read?.n === 1 && again === null, { read, afterRemove: again }]
+    } catch (error) {
+      return [false, String(error)]
+    }
+  })
+
   // --- did the app itself come up? ----------------------------------------
   // The desktop adapter is loaded before the first render; if that import throws, React never
   // mounts and the window stays empty. Waiting a moment separates "not yet" from "never".

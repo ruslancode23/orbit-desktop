@@ -17,6 +17,11 @@ fn main() {
             "report_spike",
             "set_unread",
             "set_push_to_talk",
+            "secret_get",
+            "secret_set",
+            "secret_remove",
+            "secret_keys",
+            "secret_clear",
         ]),
     ))
     .expect("tauri-build failed");
