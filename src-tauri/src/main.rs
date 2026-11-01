@@ -5,6 +5,7 @@ mod links;
 mod origin;
 #[cfg(debug_assertions)]
 mod probe;
+mod reach;
 mod secret;
 mod shortcut;
 mod tray;
@@ -88,9 +89,20 @@ fn main() {
                 .cloned()
                 .expect("tauri.conf.json must declare the main window");
 
+            // A blank white view tells nobody anything: when the domain does not answer, the
+            // window shows the bundled page that says so and offers to try again.
+            let offline = match &target {
+                origin::Target::Remote(url) => !reach::reachable(url),
+                origin::Target::Missing => false,
+            };
+            if offline {
+                if let origin::Target::Remote(url) = &target {
+                    println!("[orbit-desktop] {url} does not answer, showing the offline page");
+                }
+            }
             window_config.url = match &target {
-                origin::Target::Remote(url) => WebviewUrl::External(url.parse()?),
-                origin::Target::Missing => WebviewUrl::App("index.html".into()),
+                origin::Target::Remote(url) if !offline => WebviewUrl::External(url.parse()?),
+                _ => WebviewUrl::App("index.html".into()),
             };
 
             // What counts as "our" origin for the navigation guard. The bundled fallback page
@@ -102,7 +114,23 @@ fn main() {
             let navigation_app = app.handle().clone();
             let window_app = app.handle().clone();
 
-            let builder = WebviewWindowBuilder::from_config(app.handle(), &window_config)?
+            let builder = WebviewWindowBuilder::from_config(app.handle(), &window_config)?;
+
+            // The bundled page cannot know which domain failed, so it is told.
+            let builder = if offline {
+                let failed = match &target {
+                    origin::Target::Remote(url) => url.clone(),
+                    origin::Target::Missing => String::new(),
+                };
+                builder.initialization_script(format!(
+                    "window.__ORBIT_OFFLINE_ORIGIN__ = {};",
+                    serde_json::to_string(&failed).unwrap_or_else(|_| "\"\"".to_string())
+                ))
+            } else {
+                builder
+            };
+
+            let builder = builder
                 .on_navigation(move |url| {
                     if links::is_external(url, &own_origin) {
                         links::open_external(&navigation_app, url.as_str());

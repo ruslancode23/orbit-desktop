@@ -39,6 +39,18 @@
         margin: 0 0 1rem;
         color: #a8b0bd;
       }
+      button {
+        padding: 0.6rem 1.2rem;
+        border: 1px solid #2a3140;
+        border-radius: 0.5rem;
+        background: #1b2029;
+        color: #e6e9ef;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #232a35;
+      }
       code {
         display: block;
         margin: 0 0 1rem;
@@ -59,7 +71,21 @@
     </style>
   </head>
   <body>
-    <main>
+    <!-- Shown when the domain did not answer: a blank white window explains nothing. -->
+    <main id="offline" hidden>
+      <h1>Не удаётся подключиться к Orbit</h1>
+      <p>Приложение не отвечает по адресу:</p>
+      <code id="offline-origin"></code>
+      <p>
+        Проверьте интернет и повторите. Если вы на бете — возможно, сервер обновляют; попробуйте
+        через минуту.
+      </p>
+      <p>
+        <button type="button" id="retry">Повторить</button>
+      </p>
+    </main>
+
+    <main id="unconfigured">
       <h1>Orbit не знает, откуда взять приложение</h1>
       <p>
         Оболочка открывает веб-приложение с его собственного домена, а домен в эту сборку не зашит.
@@ -77,5 +103,18 @@
         <code>ORBIT_DESKTOP_URL=http://localhost:5173 pnpm dev</code>
       </footer>
     </main>
+
+    <script>
+      // No IPC here: the page only needs to know which address failed and to try it again.
+      const failed = window.__ORBIT_OFFLINE_ORIGIN__
+      if (failed) {
+        document.getElementById('unconfigured').hidden = true
+        document.getElementById('offline').hidden = false
+        document.getElementById('offline-origin').textContent = failed
+        document.getElementById('retry').addEventListener('click', () => {
+          window.location.href = failed
+        })
+      }
+    </script>
   </body>
 </html>
